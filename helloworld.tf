@@ -122,3 +122,43 @@ resource "aws_security_group" "firewall" {
     Name = "Firewall"
   }
 }
+
+resource "aws_network_interface" "interface_rede" {
+  subnet_id       = aws_subnet.subrede_brq.id
+  private_ips     = [var.aws_private_ip]
+  security_groups = [aws_security_group.firewall.id]
+  tags = {
+    Name = "interfaceRede"
+  }
+}
+resource "aws_eip" "ip_publico" {
+  vpc                       = true
+  network_interface         = aws_network_interface.interface_rede.id
+  associate_with_private_ip = var.aws_private_ip
+  depends_on                = [aws_internet_gateway.gw_brq]
+}
+
+output "printar_ip_publico" {
+  value = aws_eip.ip_publico.public_ip
+}
+
+resource "aws_instance" "app_web" {
+  ami               = var.aws_ami
+  instance_type     = var.aws_instance
+  availability_zone = var.aws_az
+  network_interface {
+    device_index         = 0
+    network_interface_id = aws_network_interface.interface_rede.id
+  }
+  user_data = <<-EOF
+               #! /bin/bash
+               sudo apt-get update -y
+               sudo apt-get install -y apache2
+               sudo systemctl start apache2
+               sudo systemctl enable apache2
+               sudo bash -c 'echo "<h1>Essa mensagem que deu sucesso o processo</h1>"  > /var/www/html/index.html'
+             EOF
+  tags = {
+    Name = "InstanciaLegal"
+  }
+}
